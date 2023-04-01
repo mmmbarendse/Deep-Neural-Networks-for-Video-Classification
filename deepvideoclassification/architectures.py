@@ -23,8 +23,8 @@ sys.path.append('..')
 
 from keras import backend as K
 from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger, TensorBoard
-from keras.layers import Dense, Flatten, Dropout, ZeroPadding3D, Input
-from keras.layers.recurrent import SimpleRNN, GRU, LSTM
+from keras.layers import Dense, Flatten, Dropout, ZeroPadding3D, Input, LSTM
+from keras.layers.recurrent import SimpleRNN, GRU
 from keras.layers.wrappers import TimeDistributed
 from keras.layers.convolutional import Conv2D, MaxPooling3D, Conv3D, MaxPooling2D, Convolution1D, Convolution3D, MaxPooling3D, ZeroPadding3D
 from keras.models import Sequential, Model, load_model
@@ -577,6 +577,7 @@ class Architecture(object):
                     l.trainable = True
 
             # sequential component on top of CNN
+            # #FORKING_CHECKPOINT# : HERE FRAME SIZE IS SET FOR THE INPUT OF THE ARCHITECTURES
             frames = Input(shape=(self.sequence_length, self.frame_size[0], self.frame_size[1], 3))
             x = TimeDistributed(model_cnn)(frames)
             x = TimeDistributed(Flatten())(x)
@@ -866,6 +867,7 @@ class Architecture(object):
                 verbose=True)
         else:
             # train using full dataset
+            # HERE THE MODEL TRAINING DATA IS ENTERED (WHEN A DATAGENERATOR IS NOT USED)
             history = self.model.fit(self.data.x_train, self.data.y_train, 
                 validation_data=(self.data.x_valid, self.data.y_valid),
                 batch_size=self.batch_size,

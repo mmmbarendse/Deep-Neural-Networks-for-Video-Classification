@@ -83,7 +83,6 @@ def get_video_paths():
     Functionality to use different parts of a video as train/valid/test 
     not currently implemented.
     """
-    
     path_videos = []
     for filename in os.listdir(path_data):
         if os.path.isdir(os.path.join(path_data, filename)):
@@ -100,7 +99,7 @@ def get_video_paths():
 # In[12]:
 
 
-def resize_frames(target_size):
+def resize_frames(target_size, _bed : bool = False, _verbose = False):
     """
     Resize the frames of all videos and save them to /cache/ 
     to make model fitting faster .
@@ -147,8 +146,14 @@ def resize_frames(target_size):
 
                 # open image and resize
                 filename = path_frame.split("/").pop()
-                img_frame = Image.open(path_frame)
-                img_frame = img_frame.resize(target_size)
+
+                if _bed:
+                    img_frame = np.load(path_frame)
+                    if _verbose:
+                        print(f'resize_frames(): just loaded {path_frame}, shape: {np.shape(img_frame)}')
+                else:
+                    img_frame = Image.open(path_frame)
+                    img_frame = img_frame.resize(target_size)
                 # img_frame.save(path_vid_resized + filename, "JPEG", quality = 100)
 
                 # convert to array and append to list
@@ -329,7 +334,7 @@ class Data(object):
                     return_CNN_features = False, pretrained_model_name = None, pooling = None, 
                     frame_size = None, augmentation = False, oversampling = False,
                     model_weights_path = None, custom_model_name = None,
-                    return_generator = False, batch_size = None,
+                    return_generator = False, batch_size = None, _bed = False,
                     verbose = True):
         """
         Data object constructor
@@ -370,6 +375,8 @@ class Data(object):
         self.oversampling = oversampling
         self.model_weights_path = model_weights_path
         self.custom_model_name = custom_model_name
+
+        self.bed = _bed
         
         self.return_generator = return_generator
         self.batch_size = batch_size
@@ -392,6 +399,12 @@ class Data(object):
             self.pretrained_model_name = self.pretrained_model_name.lower()
         if type(self.pooling) == str:
             self.pooling = self.pooling.lower()
+
+        if self.bed:
+            assert self.pretrained_model_name is None
+            assert self.sequence_length > 1
+            assert self.return_CNN_features == False
+            assert self.return_generator == False
         
         ################
         ### Prepare data
@@ -411,8 +424,16 @@ class Data(object):
         paths_frames = []
         for folder, subs, files in os.walk(path_data):        
             for filename in files:
+
+                if self.bed & filename[-4:].lower() == 'npy':
+                    if self.verbose:
+                        print(f'Loading frame {filename} of Boarding Event {folder}')
+                        logging.info(f'Loading frame {filename} of Boarding Event {folder}')
+                    paths_frames.append(os.path.abspath(os.path.join(folder, filename)))
+
                 if filename[-4:].lower() == '.jpg' or filename[-4:].lower() == 'jpeg' or filename[-4:].lower() == 'png':
                     paths_frames.append(os.path.abspath(os.path.join(folder, filename)))
+
         if len(paths_frames) != len(self.labels):
             error_msg = 'IMPORTANT ERROR: Number of frames ({}) in /data/ video folders needs to match number of labels ({}) in labels.csv - use notebooks/helper_check_frames_against_labels.ipynb to investigate... Note, only labels.csv and the frames you want to use (in video subfolders) should be in /data/'.format(len(paths_frames), len(self.labels))
             logger.info(error_msg)
@@ -432,7 +453,7 @@ class Data(object):
             self.frame_size = pretrained_model_sizes[self.pretrained_model_name]
         
         # precompute resized frames (won't recompute if already resized)
-        resize_frames(self.frame_size)
+        resize_frames(self.frame_size, _bed = self.bed, _verbose = self.verbose)
 
         # pre compute CNN features (won't recompute if already computed)
         if self.return_CNN_features and self.pretrained_model_name is not None:
@@ -538,7 +559,7 @@ class Data(object):
                     ##############################################################################
                     
                     if verbose:
-                        logging.info("Loading frame sequence data into memory [may take a few minutes]")
+                        logging.info(f"Loading frame sequence data into memory [may take a few minutes], self.bed: {self.bed}")
 
                     # load resized numpy array
                     path_vid_resized = path_cache + 'frames/'
