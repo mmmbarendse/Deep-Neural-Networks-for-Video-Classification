@@ -16,7 +16,7 @@ import pandas as pd
 import numpy as np
 import json
 from PIL import Image
-import cv2
+from pathlib import Path
 from sklearn.utils import shuffle
 import sys
 sys.path.append('..')
@@ -39,17 +39,11 @@ from deepvideoclassification.pretrained_CNNs import load_pretrained_model, load_
 # load preprocessing constants
 from deepvideoclassification.pretrained_CNNs import pretrained_model_len_features, pretrained_model_sizes, poolings
 
-
-# In[9]:
-
+DNN_lib_path = Path(__file__).parents[1].__str__()
 
 # setup paths
-# pwd = os.getcwd().replace("deepvideoclassification","")
-pwd = os.getcwd().replace("notebooks","")
-path_cache = pwd + 'cache/'
-path_data = pwd + 'data/'
-
-# In[10]:
+path_cache = DNN_lib_path + '/cache/'
+path_data = DNN_lib_path + '/data_cnn_ts_3d/'
 
 
 # setup logging
@@ -59,7 +53,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s, [%(levelname)-8s] [%(filename)s:%(lineno)d] %(message)s',
     handlers=[
-        logging.FileHandler("{0}/{1}.log".format(pwd, "logs")),
+        logging.FileHandler(f"{DNN_lib_path}/logs.log"),
         logging.StreamHandler()
     ])
 # init logger
@@ -149,8 +143,7 @@ def resize_frames(target_size, _bed : bool = False, _verbose = False):
 
                 if _bed:
                     img_frame = np.load(path_frame)
-                    if _verbose:
-                        print(f'resize_frames(): just loaded {path_frame}, shape: {np.shape(img_frame)}')
+
                 else:
                     img_frame = Image.open(path_frame)
                     img_frame = img_frame.resize(target_size)
@@ -331,10 +324,17 @@ class DataGenerator(keras.utils.Sequence):
 class Data(object):
     
     def __init__(self, sequence_length, 
-                    return_CNN_features = False, pretrained_model_name = None, pooling = None, 
-                    frame_size = None, augmentation = False, oversampling = False,
-                    model_weights_path = None, custom_model_name = None,
-                    return_generator = False, batch_size = None, _bed = False,
+                    return_CNN_features = False, 
+                    pretrained_model_name = None, 
+                    pooling = None, 
+                    frame_size = None, 
+                    augmentation = False, 
+                    oversampling = False,
+                    model_weights_path = None, 
+                    custom_model_name = None,
+                    return_generator = False, 
+                    batch_size = None, 
+                    _bed = False,
                     verbose = True):
         """
         Data object constructor
@@ -347,7 +347,7 @@ class Data(object):
         :pretrained_model_name: name of pretrained model (or None if not using pretrained model e.g. for 3D-CNN)
         :pooling: name of pooling variant (or None if not using pretrained model e.g. for 3D-CNN)
         :frame_size: size that frames are resized to (this is looked up for pretrained models)
-        :augmentation: whether to apply data augmentation (horizontal flips)
+        :aug3mentation: whether to apply data augmentation (horizontal flips)
         :oversampling: whether to apply oversampling to create class balance
         
         :model_weights_path: path to custom model weights if we want to load CNN model we've fine-tuned to produce features (e.g. for LRCNN)
@@ -380,6 +380,7 @@ class Data(object):
         
         self.return_generator = return_generator
         self.batch_size = batch_size
+        self.frame_size = frame_size
         
         self.verbose = verbose
         
@@ -401,10 +402,11 @@ class Data(object):
             self.pooling = self.pooling.lower()
 
         if self.bed:
-            assert self.pretrained_model_name is None
-            assert self.sequence_length > 1
-            assert self.return_CNN_features == False
-            assert self.return_generator == False
+            #assert self.pretrained_model_name is None
+            #assert self.sequence_length > 1
+            ##assert self.return_CNN_features == False, "
+            #assert self.return_generator == False
+            pass
         
         ################
         ### Prepare data
@@ -424,14 +426,10 @@ class Data(object):
         paths_frames = []
         for folder, subs, files in os.walk(path_data):        
             for filename in files:
-
-                if self.bed & filename[-4:].lower() == 'npy':
-                    if self.verbose:
-                        print(f'Loading frame {filename} of Boarding Event {folder}')
-                        logging.info(f'Loading frame {filename} of Boarding Event {folder}')
+                if self.bed & (filename[-4:].lower() == '.npy'):
                     paths_frames.append(os.path.abspath(os.path.join(folder, filename)))
 
-                if filename[-4:].lower() == '.jpg' or filename[-4:].lower() == 'jpeg' or filename[-4:].lower() == 'png':
+                if filename[-4:].lower() == '.jpg' or filename[-4:].lower() == 'jpeg' or filename[-4:].lower() == '.png':
                     paths_frames.append(os.path.abspath(os.path.join(folder, filename)))
 
         if len(paths_frames) != len(self.labels):
@@ -453,15 +451,17 @@ class Data(object):
             self.frame_size = pretrained_model_sizes[self.pretrained_model_name]
         
         # precompute resized frames (won't recompute if already resized)
-        resize_frames(self.frame_size, _bed = self.bed, _verbose = self.verbose)
+        #resize_frames(self.frame_size, _bed = self.bed, _verbose = self.verbose)
 
         # pre compute CNN features (won't recompute if already computed)
         if self.return_CNN_features and self.pretrained_model_name is not None:
             # check if pass custom weights to precompute from
             if self.model_weights_path is not None and self.custom_model_name is not None:
                 # precompute with custom weights input and name
+                print(f'precomputing CNN features with model weights')
                 precompute_CNN_features(self.pretrained_model_name, self.pooling, self.model_weights_path, self.custom_model_name)
             else:
+                print(f'precomputing CNN features without model weights')
                 precompute_CNN_features(self.pretrained_model_name, self.pooling)
             
             
@@ -488,7 +488,7 @@ class Data(object):
             
             ### sequences
             
-            if return_CNN_features:
+            if self.return_CNN_features:
                 
                 if verbose:
                     logging.info("Loading features sequence data into memory [may take a few minutes]")
@@ -497,9 +497,7 @@ class Data(object):
                 ### feature sequences
                 #####################
                 
-                path_features = path_cache + 'features/' + self.pretrained_model_name + "/" + self.pooling + '/'
-                if not self.return_CNN_features and self.pretrained_model_name is not None:
-                    path_features = path_cache + 'features/' + self.pretrained_model_name + "__" + self.custom_model_name + "/" + self.pooling + '/'
+                path_features = path_cache + 'features/' + self.custom_model_name
                 path_labels = path_cache + 'labels/'
                 
                 # read vid paths
@@ -633,7 +631,7 @@ class Data(object):
 
             ### not sequence
             
-            if return_CNN_features:
+            if self.return_CNN_features:
                 
                 if verbose:
                     logging.info("Loading features data into memory [may take a few minutes]")
@@ -642,9 +640,7 @@ class Data(object):
                 ### feature vectors
                 ###################
                 
-                path_features = path_cache + 'features/' + self.pretrained_model_name + "/" + self.pooling + '/'
-                if not self.return_CNN_features and self.pretrained_model_name is not None:
-                    path_features = path_cache + 'features/' + self.pretrained_model_name + "__" + self.custom_model_name + "/" + self.pooling + '/'
+                path_features = path_cache + 'features/' + self.custom_model_name
                 
                 path_labels = path_cache + 'labels/'
                 
@@ -1052,56 +1048,4 @@ class Data(object):
             # return total samples for each split so we can pass them to our DataGenerator
             return total_rows_train, total_rows_valid, total_rows_test
 
-
-# In[28]:
-
-
-### init generator
-# data = Data(sequence_length = 1, 
-#             return_CNN_features = False, 
-#             pretrained_model_name="vgg16",
-#             pooling = "max",
-#             return_generator=True,
-#             batch_size=32)
-#
-#
-### View batches
-# dd = []     # store all the generated data batches
-# labels = []   # store all the generated label batches
-# max_iter = 100  # maximum number of iterations, in each iteration one batch is generated; the proper value depends on batch size and size of whole data
-# i = 0
-# for d, l in data.generator_test:
-#     dd.append(d)
-#     labels.append(l)
-#     i += 1
-#     if i == max_iter:
-#         break
-
-
-# In[94]:
-
-
-if __name__ == "__main__":
-    
-    logger.info("Building resized and feature cache")
-    # build feature cache in advance by running python3 data.py
-    for pretrained_model_name in pretrained_model_names:
-        for pooling in poolings:
-            logger.info("Building resized and feature cache: {}, {}".format(pretrained_model_name, pooling))
-            data = Data(sequence_length=1, 
-                        return_CNN_features=True,
-                        pretrained_model_name = pretrained_model_name,
-                        pooling=pooling)
-            
-
-    # build h5 cache
-    logger.info("Building h5 cache")
-    for sequence_length in [2,3,5,10,20]:
-        for pretrained_model_name in pretrained_model_names:
-            logger.info("Building h5 cache: {}, {}".format(sequence_length, pretrained_model_name))
-            data = Data(sequence_length=sequence_length, 
-                        return_CNN_features=False, 
-                        pretrained_model_name = pretrained_model_name, 
-                        return_generator = True,
-                        verbose=True, batch_size=32)
 

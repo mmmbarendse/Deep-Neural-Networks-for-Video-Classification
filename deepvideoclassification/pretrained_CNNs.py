@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[1]:
-
 
 # whether to log each feature and sequence status
 verbose = True
@@ -13,35 +11,23 @@ verbose = True
 
 import os
 import sys
-import datetime
 import json
 import numpy as np
-import matplotlib.pyplot as plt
-from PIL import Image
+from pathlib import Path
+
 import cv2
-import itertools
+
+DNN_lib_path = Path(__file__).parents[1].__str__()
+
 # from contextlib import redirect_stdout
 sys.path.append('..')
 
-
-# In[3]:
-
-
-from keras.preprocessing.image import img_to_array
-
-
-# In[4]:
-
+#from keras.preprocessing.image import img_to_array
+from tensorflow.keras.preprocessing.image import img_to_array
 
 # setup paths
-# pwd = os.getcwd().replace("deepvideoclassification","")
-pwd = os.getcwd().replace("notebooks","")
-path_cache = pwd + 'cache/'
-path_data = pwd + 'data/'
-
-
-# In[5]:
-
+path_cache = DNN_lib_path + '/cache/'
+path_data = DNN_lib_path + '/data_cnn_ts_3d/'
 
 # setup logging
 # any explicit log messages or uncaught errors to stdout and file /logs.log
@@ -50,7 +36,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s, [%(levelname)-8s] [%(filename)s:%(lineno)d] %(message)s',
     handlers=[
-        logging.FileHandler("{0}/{1}.log".format(pwd, "logs")),
+        logging.FileHandler(f"{DNN_lib_path}/logs.log"),
         logging.StreamHandler()
     ])
 # init logger
@@ -192,7 +178,16 @@ def load_pretrained_model_preprocessor(pretrained_model_name):
 # In[12]:
 
 
-def precompute_CNN_features(pretrained_model_name, pooling, model_weights_path = None, custom_model_name = None):
+def precompute_CNN_features(
+        pretrained_model_name,
+        weights = None,
+        input_shape = (200, 3, 30, 30),
+        pooling = "max", 
+        model_weights_path = None, 
+        custom_model_name = None,
+        _bed = False
+    ) -> None:
+    
     """ 
     Save pretrained features array computed over all frames of each video 
     using given pretrained model and pooling method
@@ -220,7 +215,13 @@ def precompute_CNN_features(pretrained_model_name, pooling, model_weights_path =
         os.makedirs(path_features)
         
         # load pretrained model
-        pretrained_model = load_pretrained_model(pretrained_model_name, pooling, model_weights_path)
+        pretrained_model = load_pretrained_model(
+            pretrained_model_name, 
+            weights,
+            input_shape,
+            pooling, 
+            model_weights_path
+        )
 
         # load preprocessing function
         preprocess_input = load_pretrained_model_preprocessor(pretrained_model_name)
@@ -261,11 +262,15 @@ def precompute_CNN_features(pretrained_model_name, pooling, model_weights_path =
                     for j, frame_path in enumerate(frame_paths):
 
                         # load image & preprocess
-                        image = cv2.imread(frame_path, cv2.COLOR_BGR2RGB)
-                        img = cv2.resize(image, model_input_size, interpolation=cv2.INTER_AREA)
-                        img = img_to_array(img)
-                        img = np.expand_dims(img, axis=0)
-                        img = preprocess_input(img)
+                        if not _bed:
+                            image = cv2.imread(frame_path, cv2.COLOR_BGR2RGB)
+                            img = cv2.resize(image, model_input_size, interpolation=cv2.INTER_AREA)
+                            img = img_to_array(img)
+                            img = np.expand_dims(img, axis=0)
+                            img = preprocess_input(img)
+                        else:
+                            frame = np.load(frame_path)
+                            frame = preprocess_input(frame)
 
                         # get features from pretrained model
                         feature = pretrained_model.predict(img).ravel()
@@ -280,7 +285,7 @@ def precompute_CNN_features(pretrained_model_name, pooling, model_weights_path =
                         logger.info("Features already cached: {}".format(path_output))
 
             except Exception as e:
-                logging.error("Error precomputing features {} / {},{}".format(video_namepretrained_model_name, pooling))
+                logging.error("Error precomputing features {} / {},{}".format("?", pooling))
                 logging.fatal(e, exc_info=True)
                 
     else:

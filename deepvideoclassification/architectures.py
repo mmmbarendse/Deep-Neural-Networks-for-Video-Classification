@@ -9,10 +9,8 @@ import json
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from PIL import Image
-import cv2
-import gc
 import itertools
+from pathlib import Path
 from shutil import copyfile
 # from contextlib import redirect_stdout
 sys.path.append('..')
@@ -23,9 +21,7 @@ sys.path.append('..')
 
 from keras import backend as K
 from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger, TensorBoard
-from keras.layers import Dense, Flatten, Dropout, ZeroPadding3D, Input, LSTM
-from keras.layers.recurrent import SimpleRNN, GRU
-from keras.layers.wrappers import TimeDistributed
+from keras.layers import Dense, Flatten, Dropout, ZeroPadding3D, Input, LSTM, SimpleRNN, GRU, TimeDistributed
 from keras.layers.convolutional import Conv2D, MaxPooling3D, Conv3D, MaxPooling2D, Convolution1D, Convolution3D, MaxPooling3D, ZeroPadding3D
 from keras.models import Sequential, Model, load_model
 from keras.optimizers import Adam, RMSprop
@@ -41,10 +37,7 @@ from sklearn.metrics import confusion_matrix
 
 
 # setup paths
-# pwd = os.getcwd().replace("deepvideoclassification","")
-pwd = os.getcwd().replace("notebooks","")
-path_cache = pwd + 'cache/'
-path_data = pwd + 'data/'
+DNN_lib_path = Path(__file__).parents[1].__str__()
 
 # In[9]:
 
@@ -99,15 +92,26 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
 
 class Architecture(object):
     
-    def __init__(self, model_id, architecture, sequence_length, 
+    def __init__(self, 
+                model_id, 
+                architecture, 
+                sequence_length, 
                 frame_size = None, 
-                pretrained_model_name = None, pooling = None,
-                sequence_model = None, sequence_model_layers = None,
-                layer_1_size = 0, layer_2_size = 0, layer_3_size = 0, 
-                dropout = 0, convolution_kernel_size = 3, 
+                pretrained_model_name = None, 
+                custom_model_name = None,
+                pooling = None,
+                sequence_model = None, 
+                sequence_model_layers = None,
+                layer_1_size = 0, 
+                layer_2_size = 0, 
+                layer_3_size = 0, 
+                dropout = 0, 
+                convolution_kernel_size = 3, 
                 model_weights_path = None, 
                 batch_size = 32, 
                 verbose = False,
+                _bed = False,
+                data : Data = None,
                 logger = None):
         """
         Model object constructor. Contains Keras model object and training/evaluation methods. Writes model results to /models/_id_ folder
@@ -155,6 +159,8 @@ class Architecture(object):
         if type(self.frame_size) == str:
             self.frame_size = eval(self.frame_size) # parse to tuple
         self.pretrained_model_name = pretrained_model_name
+        self.custom_model_name = custom_model_name
+
         self.pooling = pooling
         self.sequence_model = sequence_model
         self.sequence_model_layers = sequence_model_layers
@@ -171,6 +177,8 @@ class Architecture(object):
         #
         self.batch_size = batch_size
         #
+        self.bed = _bed
+
         self.verbose = verbose
         
         # fix case sensitivity
@@ -199,7 +207,7 @@ class Architecture(object):
                 level=logging.INFO,
                 format='%(asctime)s, [%(levelname)-8s] [%(filename)s:%(lineno)d] %(message)s',
                 handlers=[
-                    logging.FileHandler("{0}/{1}.log".format(pwd, "logs")),
+                    logging.FileHandler(f"{DNN_lib_path}/logs.log"),
                     logging.StreamHandler()
                 ])
             # init logger - will pass this to our architecture
@@ -207,7 +215,7 @@ class Architecture(object):
             
             
         # create path based on model id
-        self.path_model = pwd + 'models/' + str(model_id) + '/'
+        self.path_model = DNN_lib_path + '/models/' + str(model_id) + '/'
         if not os.path.exists(self.path_model):
             os.makedirs(self.path_model)
         else:
@@ -237,13 +245,17 @@ class Architecture(object):
             assert self.pooling is not None, "image_MLP_frozen requires a pooling input" 
             
             
-            ### create data object for this architecture
-            if self.verbose:
-                self.logger.info("Loading data")
-            self.data = Data(sequence_length = 1, 
-                                return_CNN_features = True, 
-                                pretrained_model_name= self.pretrained_model_name,
-                                pooling = self.pooling)
+            
+            if data is None:
+                ### create data object for this architecture
+                if self.verbose:
+                    self.logger.info("Loading data")
+                self.data = Data(sequence_length = 1, 
+                                    return_CNN_features = True, 
+                                    pretrained_model_name= self.pretrained_model_name,
+                                    pooling = self.pooling)
+            else:
+                self.data = data
             
             # init model
             model = Sequential()
@@ -349,13 +361,17 @@ class Architecture(object):
             assert self.pretrained_model_name is not None, "video_MLP_concat requires a pretrained_model_name input"
             assert self.pooling is not None, "video_MLP_concat requires a pooling input"
             
-            ### create data object for this architecture
-            if self.verbose:
-                self.logger.info("Loading data")
-            self.data = Data(sequence_length = self.sequence_length, 
-                                return_CNN_features = True, 
-                                pretrained_model_name=self.pretrained_model_name,
-                                pooling = self.pooling)
+            if data is None:
+                ### create data object for this architecture
+                if self.verbose:
+                    self.logger.info("Loading data")
+                self.data = Data(sequence_length = 1, 
+                                    return_CNN_features = True, 
+                                    pretrained_model_name= self.pretrained_model_name,
+                                    pooling = self.pooling)
+            else:
+                self.data = data
+            
 
             # init model
             model = Sequential()
@@ -419,13 +435,17 @@ class Architecture(object):
                 assert self.convolution_kernel_size < self.sequence_length, "convolution_kernel_size must be less than sequence_length"
 
                 
-            ### create data object for this architecture
-            if self.verbose:
-                self.logger.info("Loading data")
-            self.data = Data(sequence_length = self.sequence_length, 
-                                return_CNN_features = True, 
-                                pretrained_model_name = self.pretrained_model_name,
-                                pooling = self.pooling)
+            if data is None:
+                ### create data object for this architecture
+                if self.verbose:
+                    self.logger.info("Loading data")
+                self.data = Data(sequence_length = 1, 
+                                    return_CNN_features = True, 
+                                    pretrained_model_name= self.pretrained_model_name,
+                                    pooling = self.pooling)
+            else:
+                self.data = data
+            
             
                 
             # set whether to return sequences for stacked sequence models
@@ -544,14 +564,17 @@ class Architecture(object):
                 
                 
             ### create data object for this architecture
-            if self.verbose:
-                self.logger.info("Loading data")
-            self.data = Data(sequence_length = self.sequence_length, 
-                                return_CNN_features = False, 
-                                return_generator=True,
-                                pretrained_model_name = self.pretrained_model_name,
-                                pooling = self.pooling,
-                                batch_size=self.batch_size)
+            if data is None:
+                ### create data object for this architecture
+                if self.verbose:
+                    self.logger.info("Loading data")
+                self.data = Data(sequence_length = 1, 
+                                    return_CNN_features = True, 
+                                    pretrained_model_name= self.pretrained_model_name,
+                                    pooling = self.pooling)
+            else:
+                self.data = data
+            
             
                 
             # set whether to return sequences for stacked sequence models
@@ -648,112 +671,7 @@ class Architecture(object):
 
             # join cnn frame model and LSTM top
             model = Model(inputs=frames, outputs=out)
-         
-        elif self.architecture == "c3d":
-            
-            #########
-            ### C3D
-            #########
-            
-            # Implement:
-            # Learning Spatiotemporal Features with 3D Convolutional Networks
-            # Tran et al 2015
-            # https://arxiv.org/abs/1412.0767
-            #
-            # Implementation inspired by https://gist.github.com/albertomontesg/d8b21a179c1e6cca0480ebdf292c34d2
-                  
-            self.frame_size == (112,112)
-            
-            ### create data object for this architecture
-            if self.verbose:
-                self.logger.info("Loading data")
-            self.data = Data(sequence_length = 16, 
-                                return_CNN_features = False, 
-                                return_generator = True,
-                                frame_size = (112,112),
-                                batch_size=self.batch_size,
-                                verbose = False)
-            
-            # C3D
-            model = Sequential()
-            # 1st layer group
-            model.add(Conv3D(64, (3, 3, 3), activation='relu', padding='same', name='conv1', input_shape=(self.sequence_length, 112, 112, 3)))
-            model.add(MaxPooling3D(pool_size=(1, 2, 2), strides=(1, 2, 2), padding='valid', name='pool1'))
-            # 2nd layer group
-            model.add(Conv3D(128, (3, 3, 3), activation='relu',padding='same', name='conv2'))
-            model.add(MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2),padding='valid', name='pool2'))
-            # 3rd layer group
-            model.add(Conv3D(256, (3, 3, 3), activation='relu',padding='same', name='conv3a'))
-            model.add(Conv3D(256, (3, 3, 3), activation='relu',padding='same', name='conv3b'))
-            model.add(MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2), padding='valid', name='pool3'))
-            # 4th layer group
-            model.add(Conv3D(512, (3, 3, 3), activation='relu',padding='same', name='conv4a'))
-            model.add(Conv3D(512, (3, 3, 3), activation='relu',padding='same', name='conv4b'))
-            model.add(MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2),padding='valid', name='pool4'))
-            # 5th layer group
-            model.add(Conv3D(512, (3, 3, 3), activation='relu',padding='same', name='conv5a'))
-            model.add(Conv3D(512, (3, 3, 3), activation='relu',padding='same', name='conv5b'))
-            model.add(ZeroPadding3D(padding=(0, 1, 1)))
-            model.add(MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2),padding='valid', name='pool5'))
-            model.add(Flatten())
-            # FC layers group
-            model.add(Dense(4096, activation='relu', name='fc6'))
-            model.add(Dropout(.5))
-            model.add(Dense(4096, activation='relu', name='fc7'))
-            model.add(Dropout(.5))
-            model.add(Dense(self.data.num_classes, activation='softmax', name='fc8'))
-            
-        elif self.architecture == "c3dsmall":
-            
-            #########################
-            ### C3D - small variation
-            #########################
-            
-            # Custom small version of C3D from paper:
-            # Learning Spatiotemporal Features with 3D Convolutional Networks
-            # Tran et al 2015
-            # https://arxiv.org/abs/1412.0767
-            #
-            # Implementation inspired by https://gist.github.com/albertomontesg/d8b21a179c1e6cca0480ebdf292c34d2
-              
-            self.frame_size == (112,112)
-            
-            ### create data object for this architecture
-            if self.verbose:
-                self.logger.info("Loading data")
-            self.data = Data(sequence_length = 16, 
-                                return_CNN_features = False, 
-                                return_generator = True,
-                                frame_size = (112,112),
-                                batch_size=self.batch_size,
-                                verbose = False)
-            
-            # C3Dsmall
-            model = Sequential()
-            # 1st layer group
-            model.add(Conv3D(32, (3,3,3), activation='relu', input_shape=(self.sequence_length, 112, 112, 3)))
-            model.add(MaxPooling3D(pool_size=(1, 2, 2), strides=(1, 2, 2)))
-            # 2nd layer group
-            model.add(Conv3D(64, (3,3,3), activation='relu'))
-            model.add(MaxPooling3D(pool_size=(1, 2, 2), strides=(1, 2, 2)))
-            # 3rd layer group
-            model.add(Conv3D(128, (3,3,3), activation='relu'))
-            model.add(Conv3D(128, (3,3,3), activation='relu'))
-            model.add(MaxPooling3D(pool_size=(1, 2, 2), strides=(1, 2, 2)))
-            # 4th layer group
-            model.add(Conv3D(256, (2,2,2), activation='relu'))
-            model.add(Conv3D(256, (2,2,2), activation='relu'))
-            model.add(MaxPooling3D(pool_size=(1, 2, 2), strides=(1, 2, 2)))
-            # FC layers group
-            model.add(Flatten())
-            model.add(Dense(256))
-            model.add(Dropout(0.5))
-            model.add(Dense(128))
-            model.add(Dropout(0.5))
-            model.add(Dense(self.data.num_classes, activation='softmax'))
-            
-        else:
-            raise NameError('Invalid architecture [' + self.architecture + '] ... must be one of [image_MLP_frozen, image_MLP_trainable, video_MLP_concat, video_LRCNN_frozen, video_LRCNN_trainable, C3D, C3Dsmall]')    
+ 
         
         
         
