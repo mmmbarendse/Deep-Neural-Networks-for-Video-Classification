@@ -15,10 +15,6 @@ from shutil import copyfile
 # from contextlib import redirect_stdout
 sys.path.append('..')
 
-
-# In[5]:
-
-
 from keras import backend as K
 from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger, TensorBoard
 from keras.layers import Dense, Flatten, Dropout, ZeroPadding3D, Input, LSTM, SimpleRNN, GRU, TimeDistributed
@@ -26,37 +22,17 @@ from keras.layers.convolutional import Conv2D, MaxPooling3D, Conv3D, MaxPooling2
 from keras.models import Sequential, Model, load_model
 from keras.optimizers import Adam, RMSprop
 
-
-# In[6]:
-
-
 from sklearn.metrics import confusion_matrix
-
-
-# In[8]:
-
 
 # setup paths
 DNN_lib_path = Path(__file__).parents[1].__str__()
 
-# In[9]:
-
-
-# In[10]:
-
 
 from deepvideoclassification.data import Data
-
 # load preprocessing functions
 from deepvideoclassification.pretrained_CNNs import load_pretrained_model, load_pretrained_model_preprocessor, precompute_CNN_features
 # load preprocessing constants
 from deepvideoclassification.pretrained_CNNs import pretrained_model_len_features, pretrained_model_sizes
-
-
-# # Confusion Matrix
-
-# In[20]:
-
 
 def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix', cmap=plt.cm.Blues):
     """
@@ -83,12 +59,6 @@ def plot_confusion_matrix(cm, classes, normalize=False, title='Confusion matrix'
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
     plt.tight_layout()
-
-
-# # Architecture class (contains keras model object and train/evaluate method, writes training results to /models/)
-
-# In[21]:
-
 
 class Architecture(object):
     
@@ -552,12 +522,14 @@ class Architecture(object):
             
             # check inputs
             assert self.sequence_length > 1, "video_LRCNN_trainable requires sequence length > 1"
+
             assert self.layer_1_size > 0, "video_LRCNN_trainable requires a layer_1_size > 0" 
-            assert self.pretrained_model_name is not None, "video_LRCNN_trainable requires a pretrained_model_name input" 
-            assert self.pooling is not None, "video_LRCNN_trainable requires a pooling input" 
+
             assert self.sequence_model_layers >= 1, "video_LRCNN_trainable requires sequence_model_layers >= 1" 
             assert self.sequence_model_layers < 4, "video_LRCNN_trainable requires sequence_model_layers <= 3" 
+
             assert self.sequence_model is not None, "video_LRCNN_trainable requires a sequence_model" 
+
             if self.sequence_model == 'Convolution1D':
                 assert self.convolution_kernel_size > 0, "Convolution1D sequence model requires convolution_kernel_size parameter > 0"
                 assert self.convolution_kernel_size < self.sequence_length, "convolution_kernel_size must be less than sequence_length"
@@ -565,6 +537,9 @@ class Architecture(object):
                 
             ### create data object for this architecture
             if data is None:
+                assert self.pretrained_model_name is not None, "video_LRCNN_trainable requires a pretrained_model_name input" 
+                assert self.pooling is not None, "video_LRCNN_trainable requires a pooling input"
+
                 ### create data object for this architecture
                 if self.verbose:
                     self.logger.info("Loading data")
@@ -573,10 +548,9 @@ class Architecture(object):
                                     pretrained_model_name= self.pretrained_model_name,
                                     pooling = self.pooling)
             else:
+                print('Using data passed to the Architecture as parameter')
                 self.data = data
             
-            
-                
             # set whether to return sequences for stacked sequence models
             return_sequences_1, return_sequences_2 = False, False
             if sequence_model_layers > 1 and layer_2_size > 0:
@@ -761,15 +735,15 @@ class Architecture(object):
         """
 
         # create optimizer with given learning rate 
-        opt = Adam(lr = learning_rate)
+        opt = Adam(learning_rate = learning_rate)
 
         # compile model
         self.model.compile(optimizer=opt, loss='binary_crossentropy', metrics=['accuracy'])
 
         # setup training callbacks
-        callback_stopper = EarlyStopping(monitor='val_acc', patience=patience, verbose=self.verbose)
+        callback_stopper = EarlyStopping(monitor='val_accuracy', patience=patience, verbose=self.verbose)
         callback_csvlogger = CSVLogger(self.path_model + 'training_round_' + str(fit_round) + '.log')
-        callback_checkpointer = ModelCheckpoint(self.path_model + 'model_round_' + str(fit_round) + '.h5', monitor='val_acc', save_best_only=True, verbose=self.verbose)
+        callback_checkpointer = ModelCheckpoint(self.path_model + 'model_round_' + str(fit_round) + '.h5', monitor='val_accuracy', save_best_only=True, verbose=self.verbose)
         callbacks = [callback_stopper, callback_checkpointer, callback_csvlogger]
 
         # fit model
@@ -847,15 +821,15 @@ class Architecture(object):
         
         print('H1', history1.history)
         print('stopped_epoch1',stopped_epoch1)
-        print(len(history1.history['val_acc']))
-        print(history1.history['val_acc'][stopped_epoch1])
+        print(len(history1.history['val_accuracy']))
+        print(history1.history['val_accuracy'][stopped_epoch1])
         
         # update best fit round (only 1 round done so this is best so far)
-        best_val_acc_1 = history1.history['val_acc'][stopped_epoch1]
+        best_val_acc_1 = history1.history['val_accuracy'][stopped_epoch1]
         best_fit_round = 1
         best_fit_round_val_acc = best_val_acc_1
         #
-        best_fit_round_train_acc = history1.history['acc'][stopped_epoch1]
+        best_fit_round_train_acc = history1.history['accuracy'][stopped_epoch1]
         best_fit_round_train_loss = history1.history['loss'][stopped_epoch1]
         best_fit_round_val_loss = history1.history['val_loss'][stopped_epoch1]
         
@@ -870,14 +844,14 @@ class Architecture(object):
         
         print('H2', history2.history)
         print('stopped_epoch2',stopped_epoch2)
-        print(len(history2.history['val_acc']))
-        print(history2.history['val_acc'][stopped_epoch2])
+        print(len(history2.history['val_accuracy']))
+        print(history2.history['val_accuracy'][stopped_epoch2])
         
         # update best fit round
-        best_val_acc_2 = history2.history['val_acc'][stopped_epoch2]
+        best_val_acc_2 = history2.history['val_accuracy'][stopped_epoch2]
         if best_val_acc_2 > best_fit_round_val_acc:
             best_fit_round_val_acc = best_val_acc_2
-            best_fit_round_train_acc = history2.history['acc'][stopped_epoch2]
+            best_fit_round_train_acc = history2.history['accuracy'][stopped_epoch2]
             best_fit_round_train_loss = history2.history['loss'][stopped_epoch2]
             best_fit_round_val_loss = history2.history['val_loss'][stopped_epoch2]
             best_fit_round = 2
@@ -893,14 +867,14 @@ class Architecture(object):
         
         print('H3', history3.history)
         print('stopped_epoch3',stopped_epoch3)
-        print(len(history3.history['val_acc']))
-        print(history3.history['val_acc'][stopped_epoch3])
+        print(len(history3.history['val_accuracy']))
+        print(history3.history['val_accuracy'][stopped_epoch3])
         
         # update best fit round
-        best_val_acc_3 = history3.history['val_acc'][stopped_epoch3]
+        best_val_acc_3 = history3.history['val_accuracy'][stopped_epoch3]
         if best_val_acc_3 > best_fit_round_val_acc:
             best_fit_round_val_acc = best_val_acc_3
-            best_fit_round_train_acc = history3.history['acc'][stopped_epoch3]
+            best_fit_round_train_acc = history3.history['accuracy'][stopped_epoch3]
             best_fit_round_train_loss = history3.history['loss'][stopped_epoch3]
             best_fit_round_val_loss = history3.history['val_loss'][stopped_epoch3]
             best_fit_round = 3
@@ -1027,13 +1001,23 @@ class Architecture(object):
         ##########################
         ### Compute raw error rate
         ##########################
-        
+
+        numerization_dict = dict({
+            None : 4,
+            np.nan: 4, 
+            'pre-deboarding': 0,
+            'deboarding': 1,
+            'phase-change': 2,
+            'boarding': 3,
+            'post-boarding': 0
+        })
+                
         # build dataframe and calculate test error (assuming we classify using majority rule, not ROC cutoff approach)
         pdf = pd.DataFrame(y_pred, columns = ['pred'])
-        pdf['prediction'] = pdf['pred'].apply(lambda x: self.data.label_map[str(x)])
+        pdf['prediction'] = pdf['pred'].apply(lambda x: self.data.label_map[x])
 
         truth = pd.DataFrame(y_test, columns = ['truth'])
-        truth['label'] = truth['truth'].apply(lambda x: self.data.label_map[str(x)])
+        truth['label'] = truth['truth'].apply(lambda x: self.data.label_map[x])
         truth = truth[['label']]
 
         pdf = pd.concat([pdf, truth], axis=1)

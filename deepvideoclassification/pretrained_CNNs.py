@@ -95,7 +95,7 @@ poolings = ['max','avg']
 # In[10]:
 
 
-def load_pretrained_model(pretrained_model_name, pooling, model_weights_path = None):
+def load_pretrained_model(pretrained_model_name, pooling, model_weights_path = None, weights=None):
     """ Load pretrained model with given pooling applied
     
     Args:
@@ -116,23 +116,23 @@ def load_pretrained_model(pretrained_model_name, pooling, model_weights_path = N
     ### import pretrained model
     ###########################
     if pretrained_model_name == "xception":   
-        from keras.applications.xception import Xception
-        model = Xception(include_top=False, weights='imagenet', pooling=pooling)
+        from tensorflow.keras.applications.xception import Xception
+        model = Xception(include_top=False, weights=weights, pooling=pooling)
     elif pretrained_model_name == "vgg16":   
-        from keras.applications.vgg16 import VGG16
-        model = VGG16(include_top=False, weights='imagenet', pooling=pooling)
+        from tensorflow.keras.applications.vgg16 import VGG16
+        model = VGG16(include_top=False, weights=weights, pooling=pooling)
     elif pretrained_model_name == "resnet50":   
-        from keras.applications.resnet50 import ResNet50
-        model = ResNet50(include_top=False, weights='imagenet', pooling=pooling)
+        from tensorflow.keras.applications.resnet50 import ResNet50
+        model = ResNet50(include_top=False, weights=weights, pooling=pooling)
     elif pretrained_model_name == "inception_v3":   
-        from keras.applications.inception_v3 import InceptionV3
-        model = InceptionV3(include_top=False, weights='imagenet', pooling=pooling)
+        from tensorflow.keras.applications.inception_v3 import InceptionV3
+        model = InceptionV3(include_top=False, weights=weights, pooling=pooling)
     elif pretrained_model_name == "inception_resnet_v2":   
-        from keras.applications.inception_resnet_v2 import InceptionResNetV2
-        model = InceptionResNetV2(include_top=False, weights='imagenet', pooling=pooling)
+        from tensorflow.keras.applications.inception_resnet_v2 import InceptionResNetV2
+        model = InceptionResNetV2(include_top=False, weights=weights, pooling=pooling)
     elif pretrained_model_name == "mobilenetv2_1.00_224":   
-        from keras.applications.mobilenet_v2 import MobileNetV2
-        model = MobileNetV2(include_top=False, weights='imagenet', pooling=pooling)
+        from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
+        model = MobileNetV2(include_top=False, weights=weights, pooling=pooling)
     else:
         raise NameError('Invalid pretrained model name - must be one of ["Xception", "VGG16", "ResNet50", "InceptionV3", "InceptionResNetV2", "MobileNetV2"]')
     
@@ -158,17 +158,17 @@ def load_pretrained_model_preprocessor(pretrained_model_name):
     pretrained_model_name = pretrained_model_name.lower()
         
     if pretrained_model_name == "xception":   
-        from keras.applications.xception import preprocess_input
+        from tensorflow.keras.applications.xception import preprocess_input
     elif pretrained_model_name == "vgg16":   
-        from keras.applications.vgg16 import preprocess_input
+        from tensorflow.keras.applications.vgg16 import preprocess_input
     elif pretrained_model_name == "resnet50":   
-        from keras.applications.resnet50 import preprocess_input
+        from tensorflow.keras.applications.resnet50 import preprocess_input
     elif pretrained_model_name == "inception_v3":   
-        from keras.applications.inception_v3 import preprocess_input
+        from tensorflow.keras.applications.inception_v3 import preprocess_input
     elif pretrained_model_name == "inception_resnet_v2":   
-        from keras.applications.inception_resnet_v2 import preprocess_input
+        from tensorflow.keras.applications.inception_resnet_v2 import preprocess_input
     elif pretrained_model_name == "mobilenetv2_1.00_224":   
-        from keras.applications.mobilenet_v2 import preprocess_input
+        from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
     else:
         raise NameError('Invalid pretrained model name - must be one of ["Xception", "VGG16", "ResNet50", "InceptionV3", "InceptionResNetV2", "MobileNetV2"]')
         
