@@ -1,0 +1,26 @@
+{
+    "architecture": "video_lrcnn_frozen",
+    "batch_size": 32,
+    "bed": true,
+    "convolution_kernel_size": 3,
+    "custom_model_name": "ResNet50_pop_grids",
+    "data_shape": "<__main__.Data object at 0x7f7f3c72b9d0>",
+    "dropout": 0.2,
+    "frame_size": [
+        224,
+        224
+    ],
+    "layer_1_size": 256,
+    "layer_2_size": 512,
+    "layer_3_size": 256,
+    "model_id": 1,
+    "model_weights_path": null,
+    "num_features": 2048,
+    "path_model": "/home/tiesbarendse/Documents/00_Uni/22_23/pap/Deep-Neural-Networks-for-Video-Classification/notebooks/../models/1/",
+    "pooling": "max",
+    "pretrained_model_name": "resnet50",
+    "sequence_length": 20,
+    "sequence_model": "LSTM",
+    "sequence_model_layers": 3,
+    "verbose": true
+}

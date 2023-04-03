@@ -161,6 +161,7 @@ class Architecture(object):
         
         # read num features from pretrained model
         if pretrained_model_name is not None and type(pretrained_model_name) == str:
+            pretrained_model_name = pretrained_model_name.lower()
             self.num_features = pretrained_model_len_features[pretrained_model_name]
             self.frame_size = pretrained_model_sizes[pretrained_model_name]
         
