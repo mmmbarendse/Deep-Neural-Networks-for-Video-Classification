@@ -17,8 +17,8 @@ sys.path.append('..')
 
 from keras import backend as K
 from keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger, TensorBoard
-from keras.layers import Dense, Flatten, Dropout, ZeroPadding3D, Input, LSTM, SimpleRNN, GRU, TimeDistributed
-from keras.layers.convolutional import Conv2D, MaxPooling3D, Conv3D, MaxPooling2D, Convolution1D, Convolution3D, MaxPooling3D, ZeroPadding3D
+from keras.layers import Dense, Flatten, Dropout, ZeroPadding3D, Input, LSTM, SimpleRNN, GRU, TimeDistributed, Conv2D, MaxPooling3D, Conv3D, MaxPooling2D, Convolution1D, Convolution3D, MaxPooling3D, ZeroPadding3D
+#from tensorflow.keras.layers import 
 from keras.models import Sequential, Model, load_model
 from keras.optimizers import Adam, RMSprop
 
@@ -1002,16 +1002,6 @@ class Architecture(object):
         ##########################
         ### Compute raw error rate
         ##########################
-
-        numerization_dict = dict({
-            None : 4,
-            np.nan: 4, 
-            'pre-deboarding': 0,
-            'deboarding': 1,
-            'phase-change': 2,
-            'boarding': 3,
-            'post-boarding': 0
-        })
                 
         # build dataframe and calculate test error (assuming we classify using majority rule, not ROC cutoff approach)
         pdf = pd.DataFrame(y_pred, columns = ['pred'])
